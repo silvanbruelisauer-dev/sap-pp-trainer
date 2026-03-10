@@ -35,14 +35,37 @@
   </div>
 </div>
 
+<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <script>
   var FLOW_URL = "https://default6b1b7a077cf94f3ba5000244004fd8.41.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fd450e8b5d7d403382d3b327ec8dde83/triggers/manual/paths/invoke?api-version=1";
+
+  var msalConfig = {
+    auth: {
+      clientId: "1950a258-227b-4e31-a9cf-717495945fc2",
+      authority: "https://login.microsoftonline.com/common"
+    }
+  };
+
+  var msalInstance = new msal.PublicClientApplication(msalConfig);
 
   document.getElementById("chat-input").addEventListener("keydown", function(e) {
     if (e.key === "Enter") sendMessage();
   });
 
-  function sendMessage() {
+  async function getToken() {
+    var accounts = msalInstance.getAllAccounts();
+    if (accounts.length === 0) {
+      await msalInstance.loginPopup({ scopes: ["https://service.flow.microsoft.com/.default"] });
+      accounts = msalInstance.getAllAccounts();
+    }
+    var result = await msalInstance.acquireTokenSilent({
+      scopes: ["https://service.flow.microsoft.com/.default"],
+      account: accounts[0]
+    });
+    return result.accessToken;
+  }
+
+  async function sendMessage() {
     var input = document.getElementById("chat-input");
     var messages = document.getElementById("chat-messages");
     var btn = document.getElementById("send-btn");
@@ -55,23 +78,27 @@
 
     var typing = appendMessage("Thinking...", "bot typing");
 
-    fetch(FLOW_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ message: text })
-    })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
+    try {
+      var token = await getToken();
+      var res = await fetch(FLOW_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({ message: text })
+      });
+      var data = await res.json();
       typing.remove();
       appendMessage(data.response || "No response received.", "bot");
-      btn.disabled = false;
-      messages.scrollTop = messages.scrollHeight;
-    })
-    .catch(function(err) {
+    } catch(err) {
       typing.remove();
       appendMessage("Error connecting. Please try again.", "bot");
-      btn.disabled = false;
-    });
+      console.error(err);
+    }
+
+    btn.disabled = false;
+    messages.scrollTop = messages.scrollHeight;
   }
 
   function appendMessage(text, type) {

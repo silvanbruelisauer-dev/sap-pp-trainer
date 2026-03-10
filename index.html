@@ -24,10 +24,10 @@
 <div id="chat-container">
   <div id="chat-header">
     Digital Silvan
-    <span>Your SAP PP & A Expert</span>
+    <span>Your SAP PP Expert</span>
   </div>
   <div id="chat-messages">
-    <div class="msg bot">👋 Hi! I'm your Digital Silvan. Ask me about MRP, production orders, tcodes, planning strategies, or anything PP-related.</div>
+    <div class="msg bot">👋 Hi! I am Silvan, your SAP PP Expert. Ask me about MRP, production orders, tcodes, planning strategies, or anything PP-related.</div>
   </div>
   <div id="chat-input-area">
     <input id="chat-input" type="text" placeholder="e.g. What is MD02? How does MRP work?" />
@@ -36,47 +36,48 @@
 </div>
 
 <script>
-  const FLOW_URL = "https://default6b1b7a077cf94f3ba5000244004fd8.41.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fd450e8b5d7d403382d3b327ec8dde83/triggers/manual/paths/invoke?api-version=1";
+  var FLOW_URL = "https://default6b1b7a077cf94f3ba5000244004fd8.41.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fd450e8b5d7d403382d3b327ec8dde83/triggers/manual/paths/invoke?api-version=1";
 
-  document.getElementById('chat-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') sendMessage();
+  document.getElementById("chat-input").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") sendMessage();
   });
 
-  async function sendMessage() {
-    const input = document.getElementById('chat-input');
-    const messages = document.getElementById('chat-messages');
-    const btn = document.getElementById('send-btn');
-    const text = input.value.trim();
+  function sendMessage() {
+    var input = document.getElementById("chat-input");
+    var messages = document.getElementById("chat-messages");
+    var btn = document.getElementById("send-btn");
+    var text = input.value.trim();
     if (!text) return;
 
-    appendMessage(text, 'user');
-    input.value = '';
+    appendMessage(text, "user");
+    input.value = "";
     btn.disabled = true;
 
-    const typing = appendMessage('Thinking...', 'bot typing');
+    var typing = appendMessage("Thinking...", "bot typing");
 
-    try {
-      const res = await fetch(FLOW_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' }, ```  Then in **Power Automate** → `SAP PP Trainer - Claude API` → open the **HTTP action** → find this in the Body: ``` @{triggerBody()?['message']} ``` Replace with: ``` @{json(triggerBody())?['message']}
-        body: JSON.stringify({ message: text })
-      });
-      const data = await res.json();
+    fetch(FLOW_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ message: text })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
       typing.remove();
-      appendMessage(data.response || 'No response received.', 'bot');
-    } catch (err) {
+      appendMessage(data.response || "No response received.", "bot");
+      btn.disabled = false;
+      messages.scrollTop = messages.scrollHeight;
+    })
+    .catch(function(err) {
       typing.remove();
-      appendMessage('Error connecting to the trainer. Please try again.', 'bot');
-    }
-
-    btn.disabled = false;
-    messages.scrollTop = messages.scrollHeight;
+      appendMessage("Error connecting. Please try again.", "bot");
+      btn.disabled = false;
+    });
   }
 
   function appendMessage(text, type) {
-    const messages = document.getElementById('chat-messages');
-    const div = document.createElement('div');
-    div.className = 'msg ' + type;
+    var messages = document.getElementById("chat-messages");
+    var div = document.createElement("div");
+    div.className = "msg " + type;
     div.textContent = text;
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;

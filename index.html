@@ -1,115 +1,397 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAP CoE — Service Routing</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-  body { background: #f3f2f1; display: flex; justify-content: center; padding: 16px; }
-  #chat-container { width: 100%; max-width: 700px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 520px; }
-  #chat-header { background: #0078d4; color: white; padding: 14px 18px; border-radius: 8px 8px 0 0; font-weight: 600; font-size: 15px; }
-  #chat-header span { font-weight: 300; font-size: 13px; display: block; opacity: 0.85; }
-  #chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .msg { max-width: 85%; padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
-  .msg.user { background: #0078d4; color: white; align-self: flex-end; border-radius: 8px 8px 0 8px; }
-  .msg.bot { background: #f3f2f1; color: #201f1e; align-self: flex-start; border-radius: 8px 8px 8px 0; }
-  .msg.typing { color: #888; font-style: italic; }
-  #chat-input-area { padding: 12px; border-top: 1px solid #e1dfdd; display: flex; gap: 8px; }
-  #chat-input { flex: 1; padding: 10px 14px; border: 1px solid #c8c6c4; border-radius: 6px; font-size: 14px; outline: none; }
-  #chat-input:focus { border-color: #0078d4; }
-  #send-btn { background: #0078d4; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
-  #send-btn:hover { background: #106ebe; }
-  #send-btn:disabled { background: #c8c6c4; cursor: not-allowed; }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f4f3f0; --surface: #ffffff; --border: #e2e0db; --border-strong: #c8c5be;
+    --text: #1a1917; --text-2: #6b6860; --text-3: #9e9b96;
+    --accent: #1a4a8a; --accent-light: #e8eef7; --accent-hover: #153d75;
+    --font: 'IBM Plex Sans', sans-serif; --mono: 'IBM Plex Mono', monospace;
+    --radius: 12px; --radius-sm: 6px;
+  }
+  body { font-family: var(--font); background: var(--bg); display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .shell { width: 100%; max-width: 680px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; height: 700px; box-shadow: 0 2px 24px rgba(0,0,0,0.06); }
+
+  .header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .avatar { width: 34px; height: 34px; background: var(--accent); border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .avatar svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 1.8; stroke-linecap: round; }
+  .header-text { flex: 1; }
+  .header-title { font-size: 13px; font-weight: 600; color: var(--text); }
+  .header-sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+  .restart-btn { background: none; border: 1px solid var(--border); font-size: 11px; color: var(--text-3); cursor: pointer; font-family: var(--font); padding: 4px 10px; border-radius: 20px; transition: all 0.12s; }
+  .restart-btn:hover { color: var(--text-2); border-color: var(--border-strong); }
+
+  .messages { flex: 1; overflow-y: auto; padding: 20px 20px 8px; display: flex; flex-direction: column; gap: 6px; scroll-behavior: smooth; }
+  .messages::-webkit-scrollbar { width: 3px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+  .msg-row { display: flex; gap: 8px; align-items: flex-end; }
+  .msg-row.user { flex-direction: row-reverse; }
+  .msg-row.bot + .msg-row.user, .msg-row.user + .msg-row.bot { margin-top: 10px; }
+
+  .msg-avatar { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; font-weight: 600; color: #fff; }
+  .msg-avatar.user-av { background: var(--border); color: var(--text-2); }
+
+  .bubble { max-width: 80%; padding: 10px 14px; font-size: 14px; line-height: 1.6; color: var(--text); background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; }
+  .msg-row.bot .bubble { border-radius: 12px 12px 12px 3px; }
+  .msg-row.user .bubble { background: var(--accent); color: #fff; border-color: var(--accent); border-radius: 12px 12px 3px 12px; }
+
+  .options-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0 4px 34px; }
+  .option-chip { padding: 6px 13px; border: 1px solid var(--border-strong); border-radius: 20px; font-size: 13px; color: var(--text-2); background: var(--surface); cursor: pointer; transition: all 0.12s; font-family: var(--font); }
+  .option-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .option-chip.selected { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+  .option-chip:disabled { opacity: 0.3; pointer-events: none; }
+
+  .typing-indicator { display: flex; align-items: center; gap: 4px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px 12px 12px 3px; }
+  .typing-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); animation: bounce 1.2s ease-in-out infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform:translateY(0);opacity:.4; } 30% { transform:translateY(-4px);opacity:1; } }
+
+  .result-card { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; width: calc(100% - 34px); margin-left: 34px; margin-top: 6px; flex-shrink: 0; }
+  .result-header { background: var(--accent); padding: 14px 16px; color: #fff; }
+  .service-code { font-family: var(--mono); font-size: 11px; opacity: 0.7; letter-spacing: 0.05em; }
+  .service-name { font-size: 15px; font-weight: 600; margin-top: 3px; }
+  .category-name { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+  .result-body { padding: 14px 16px; background: var(--surface); }
+  .inputs-label { font-size: 10px; font-weight: 600; color: var(--text-3); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 8px; }
+  .input-chip { display: inline-block; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 12px; color: var(--text-2); margin: 2px 3px 2px 0; font-family: var(--mono); }
+  .open-form-btn { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 12px; padding: 10px 14px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .open-form-btn:hover { background: var(--accent-hover); }
+  .open-form-btn svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+
+  .input-area { padding: 12px 16px 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+  textarea { flex: 1; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 9px 13px; font-family: var(--font); font-size: 14px; color: var(--text); background: var(--surface); resize: none; outline: none; line-height: 1.5; max-height: 100px; min-height: 40px; transition: border-color 0.15s; }
+  textarea::placeholder { color: var(--text-3); }
+  textarea:focus { border-color: var(--accent); }
+  .send-btn { width: 40px; height: 40px; background: var(--accent); border: none; border-radius: var(--radius-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; flex-shrink: 0; }
+  .send-btn:hover { background: var(--accent-hover); }
+  .send-btn:disabled { background: var(--border); cursor: not-allowed; }
+  .send-btn svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
 <body>
-<div id="chat-container">
-  <div id="chat-header">
-    Digital Silvan
-    <span>Your SAP PP Expert</span>
+<div class="shell">
+  <div class="header">
+    <div class="avatar">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div class="header-text">
+      <div class="header-title">SAP CoE — Service Routing</div>
+      <div class="header-sub">Weidmann Group · Global SAP Service</div>
+    </div>
+    <div class="status-dot"></div>
+    <button class="restart-btn" onclick="restart()">↺ restart</button>
   </div>
-  <div id="chat-messages">
-    <div class="msg bot">👋 Hi! I am Silvan, your SAP PP Expert. Ask me about MRP, production orders, tcodes, planning strategies, or anything PP-related.</div>
-  </div>
-  <div id="chat-input-area">
-    <input id="chat-input" type="text" placeholder="e.g. What is MD02? How does MRP work?" />
-    <button id="send-btn" onclick="sendMessage()">Send</button>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="input-area">
+    <textarea id="input" placeholder="Or describe your request in your own words…" rows="1"
+      onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <button class="send-btn" id="sendBtn" onclick="send()">
+      <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
   </div>
 </div>
 
-<script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
 <script>
-  var FLOW_URL = "https://default6b1b7a077cf94f3ba5000244004fd8.41.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/fd450e8b5d7d403382d3b327ec8dde83/triggers/manual/paths/invoke?api-version=1";
+const API_KEY = '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';
 
-  var msalConfig = {
-    auth: {
-      clientId: "1950a258-227b-4e31-a9cf-717495945fc2",
-      authority: "https://login.microsoftonline.com/common"
-    }
-  };
+const SYSTEM_PROMPT = `You are the SAP CoE Service Routing Assistant for Weidmann Group. Route users to the correct SAP service and service category in 1–3 conversational questions.
 
-  var msalInstance = new msal.PublicClientApplication(msalConfig);
+## Service Catalog
+CI1000 SAP Development Service — ABAP / Enhancements | Interfaces & Integration | Forms / Output Management | Workflow / BRF+ | Data / Reports / Queries | Performance / Technical Debt | Other / Triage
+CI1001 SAP Application Change — Customizing / Determination | Fiori / App Behavior | Data Quality / Master Data Rules | Authorizations (Functional Request) | Other / Triage
+CI1002 SAP PLM Change — Engineering Change Management (ECM) | BOM / Routing Governance | Document Management (DMS) | Classification / Characteristics | Other / Triage
+CI1003 SAP PP & Automation Change — PP Master Data (Workcenter/Routing/BOM) | Planning Parameters (MRP/Capacity/Calendars) | Production Execution (Orders/Confirmations) | Cycle Times / PMEVC / VC Dependency | Shopfloor Integration (MES/Automation) | Shopfloor Printing / Devices | Other / Triage
+CI1004 IT Leadership Team (ITLT) — Portfolio / Prioritization | Architecture / Standards | Risk / Compliance | Budget / Licensing | Other / Triage
+CI1005 Bee360 - Further Developments — Service Catalog / Structure | Workflow / Automation | Integrations (SharePoint/Teams/SAP) | Reporting / Dashboards | Other / Triage
+SE1000 SAP Operations — Monitoring / Alerts | Incident Response | Scheduled Activities | Other / Triage
+SE1001 SAP Basis Support — User Administration | Authorizations (Technical Execution) | Printing / Spool | Connectivity / RFC / Interfaces Platform | Transports / System Landscape | Other / Triage
+SE1002 SAP Cloud Application Service — CPI / Integration Suite | SAP Analytics Cloud (SAC) | IAS / IPS / SSO | Other / Triage
+SE1014 SAP EAM & Project Support — Cutover / Go-live Support | Data Migration / Uploads | Other / Triage
+SE1015 SAP Testing Service — Test Planning | Test Case Design | Defect Triage | Other / Triage
+SE1016 SAP Service Desk — How-to / User Support | Incident / Error | Request Routing / Assignment | Other / Triage
 
-  document.getElementById("chat-input").addEventListener("keydown", function(e) {
-    if (e.key === "Enter") sendMessage();
+## Required Inputs per Category
+CI1000 - ABAP / Enhancements: System (DEV/QAS/PRD); Client; Process/Module; App/T-code; Current vs Target; Acceptance criteria; Example documents; Object name; Screenshots/logs; Requested go-live; Business impact
+CI1000 - Interfaces & Integration: Sending system; Receiving system; Direction; Interface name; Message type/IDoc/API; Middleware; Frequency; Payload sample; Mapping rules; Error examples; Monitoring transaction/log IDs
+CI1000 - Forms / Output Management: Document type; Output type; Form name; Sample spool/PDF; Language/Country; Determination rules; Recipient logic; Printer/output device; Example document numbers; Screenshots
+CI1000 - Workflow / BRF+: Process trigger; Rule conditions; Actors/roles; Escalation; SLA/timeouts; Current vs Target; Test cases; Org data source; Screenshots
+CI1000 - Data / Reports / Queries: Report name; Selection logic; Output fields; Filters; Volumes; Example records; Export format; Consumers; Scheduling needs
+CI1000 - Performance / Technical Debt: Transaction/app; Steps to reproduce; Timestamp; Runtime evidence (STAD/ST12); Data volume; Peak time; System/client
+CI1001 - Customizing / Determination: Module/process; Org units; Current vs Target; Affected document types; Example documents; Acceptance criteria; Requested date
+CI1001 - Fiori / App Behavior: App ID; Role/catalog; User group; Current vs Target; Screenshots; System; Acceptance criteria
+CI1001 - Data Quality / Master Data Rules: Object type; Mandatory fields; Validation rule; Where enforced; Current issues; Example records; Acceptance criteria
+CI1001 - Authorizations (Functional Request): User(s); Role(s) requested; Business justification; SoD constraints; System; Valid-from date; Approver
+CI1002 - Engineering Change Management: Change number; Object(s) impacted; Effectivity date; Plants; Reason; Current vs Target; Approval chain; Attachments/specs
+CI1002 - BOM / Routing Governance: Material(s); Plant(s); BOM usage; Alternatives; Change reason; Current vs Target; Valid-from; Example BOMs
+CI1002 - Document Management (DMS): DIR type; Document number; Status/lifecycle; Storage location; Naming rules; Linking target objects; Permissions
+CI1002 - Classification / Characteristics: Object type; Class/characteristics; Current vs Target; Value help rules; Affected materials; Example objects
+CI1003 - PP Master Data: Plant; Workcenter; Workcenter type; Routing group; Operation; Standard values/cycle time; Control key; BOM usage; Materials; Valid-from
+CI1003 - Planning Parameters: Plant; Material(s); MRP controller; MRP type; Strategy group; Lot size; Lead times; Shift calendar; Current vs Target; Acceptance criteria
+CI1003 - Production Execution: Plant; Order type; Confirmation method; Backflush rules; Movement types; Current vs Target; Example order numbers; Screenshots/errors
+CI1003 - Cycle Times / PMEVC: Plant; Material family; VC characteristics; Dependency name; PMEVC table name; Current vs Target cycle time logic; Sample configurations
+CI1003 - Shopfloor Integration: Site/plant; Line/workcenter; Interface name; Direction; Message/event; Data elements; Device/system; Error logs; Test window
+CI1003 - Shopfloor Printing: Plant; Workcenter/line; Printer name; Output type; Label/form; Trigger point; Sample output; Spool ID
+CI1004 - Portfolio / Prioritization: Topic; Options; Recommendation; Business impact; Cost/effort estimate; Target decision date; Stakeholders; Risk if delayed
+CI1004 - Architecture / Standards: Standard impacted; Current vs target standard; Rationale; Affected systems; Compliance impact; Timeline
+CI1004 - Risk / Compliance: Risk description; Evidence; Systems in scope; Severity; Required controls; Deadline; Mitigation options
+CI1004 - Budget / Licensing: Vendor/product; Cost; Renewal date; Usage data; Approver; Required decision date
+CI1005 - Service Catalog / Structure: Service affected; Proposed structure; Field list; Mandatory rules; Default values; Roles; Go-live date
+CI1005 - Workflow / Automation: Process to automate; Trigger; States; Roles; Approval rules; Notifications; SLA targets; Test cases
+CI1005 - Integrations: Integration endpoints; Data to sync; Direction; Frequency; Auth method; Mapping; Error handling
+CI1005 - Reporting / Dashboards: Report purpose; Audience; Measures; Filters; Data sources; Refresh frequency; Acceptance criteria
+SE1000 - Monitoring / Alerts: System; Component; Timestamp; Alert text; Impact; Business process affected; Evidence; Priority/urgency
+SE1000 - Incident Response: System; Start time; Symptoms; Users affected; Steps already tried; Error messages; Workaround; Contact person
+SE1000 - Scheduled Activities: System; Window/date; Activity description; Stakeholders; Risk; Rollback; Approver
+SE1001 - User Administration: User ID; System/client; Required roles; Valid-from; Approver; Reason; Urgency
+SE1001 - Authorizations (Technical): User; Transaction/app; Timestamp; SU53 or error text; Role requested; Business justification; System/client; Approver
+SE1001 - Printing / Spool: System; Printer name; Device type; Location/site; User; Spool ID; Output type; Error text; Test document
+SE1001 - Connectivity / RFC: Systems involved; Destination name; Error logs; Timestamp; Cert details; Connectivity path; Change window
+SE1001 - Transports: Transport ID(s); Target system/client; Import window; Sequence/dependencies; Error logs; Business impact
+SE1002 - CPI / Integration Suite: Tenant; iFlow name; Endpoint; Direction; Payload; Error logs; Timestamp; Auth method; Change window
+SE1002 - SAP Analytics Cloud: Tenant; Story/model name; User(s); Error message; Data source; Refresh schedule; Workspace
+SE1002 - IAS / IPS / SSO: Tenant; User; Application; Error message; Timestamp; Group/role mapping; IdP details; Screenshots/logs
+SE1014 - Cutover / Go-live Support: Project; Site/plant; Go-live date; Task list; Owners; Dependencies; Freeze window; Risk
+SE1014 - Data Migration / Uploads: Object type; Template file; Volume; Mapping rules; Validation rules; Cutover window; Reconciliation approach
+SE1015 - Test Planning: Project/change; Scope; Systems; Test phases; Timeline; Roles; Entry/exit criteria; Risks
+SE1015 - Test Case Design: Process; Steps; Expected result; Required master data; Test users/roles; Test scripts
+SE1015 - Defect Triage: System; Steps to reproduce; Actual vs expected; Severity; Screenshots/logs; Related change/transport
+SE1016 - How-to / User Support: User; System; Transaction/app; What you tried; Screenshot; Desired outcome; Urgency
+SE1016 - Incident / Error: System; Timestamp; User; Steps; Error text; Screenshot; Impact; Frequency; Workaround tried
+SE1016 - Request Routing / Assignment: Short description; Process area; System; Plant/org unit; Impact; Priority
+
+## Rules
+- Ask at most 3 questions total.
+- ALWAYS return valid JSON only. No text outside JSON.
+- Two response types only:
+
+Type 1 — still routing:
+{"type":"question","question":"Short question?","options":["Option A","Option B","Option C","Not sure / other"]}
+Options: 3–5 items, concise (2–5 words), always end with "Not sure / other".
+
+Type 2 — final routing:
+{"type":"routed","service_code":"CI1003","service_name":"SAP PP & Automation Change","category":"Planning Parameters (MRP/Capacity/Calendars)","summary":"One sentence why.","required_inputs":["Plant","Material(s)","MRP type","Current vs Target"]}
+
+## Key signals
+broken/error/stopped → SE1000, SE1001, SE1016
+user access/login/SU53 → SE1001 Authorizations (Technical)
+transport/import → SE1001 Transports
+MRP/planning/strategy/lot size → CI1003 Planning Parameters
+production order/confirmation/backflush → CI1003 Production Execution
+workcenter/routing/BOM (PP context) → CI1003 PP Master Data
+BOM/routing (PLM/ECM context) → CI1002
+shopfloor/MES/PLC/SCADA → CI1003 Shopfloor Integration
+label/shopfloor print → CI1003 Shopfloor Printing
+ABAP/BAdI/user-exit/enhancement → CI1000 ABAP
+IDoc/API/interface (new/change) → CI1000 Interfaces
+RFC/connectivity (technical issue) → SE1001 Connectivity
+CPI/iFlow → SE1002 CPI
+SSO/IAS/IPS → SE1002 IAS
+SAC/analytics cloud → SE1002 SAC
+Fiori/tile/catalog → CI1001 Fiori
+authorization role request (functional) → CI1001 Authorizations
+report/query/CDS → CI1000 Data/Reports
+ECM/change number → CI1002 ECM
+test/defect → SE1015
+go-live/cutover/migration → SE1014
+Bee360 → CI1005
+budget/license/architecture/risk → CI1004
+how-to/how do I → SE1016 How-to`;
+
+let history = [];
+let isLoading = false;
+
+function init() {
+  history = [];
+  isLoading = false;
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('input').value = '';
+  document.getElementById('sendBtn').disabled = false;
+
+  // First question rendered locally — no API call needed
+  renderQuestion(
+    "What best describes your request?",
+    ["Something is broken / not working", "I need a change or new feature", "I have a question / how-to", "Need access or authorization", "Testing or go-live support", "Not sure / other"]
+  );
+}
+
+function renderQuestion(questionText, options) {
+  lockPreviousOptions();
+  const messages = document.getElementById('messages');
+
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `<div class="msg-avatar">SC</div><div class="bubble">${escHtml(questionText)}</div>`;
+  messages.appendChild(row);
+
+  const optRow = document.createElement('div');
+  optRow.className = 'options-row';
+  options.forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'option-chip';
+    btn.textContent = label;
+    btn.onclick = () => {
+      btn.classList.add('selected');
+      lockPreviousOptions();
+      sendMessage(label);
+    };
+    optRow.appendChild(btn);
   });
+  messages.appendChild(optRow);
+  scrollBottom();
+}
 
-  async function getToken() {
-    var accounts = msalInstance.getAllAccounts();
-    if (accounts.length === 0) {
-      await msalInstance.loginPopup({ scopes: ["https://service.flow.microsoft.com/.default"] });
-      accounts = msalInstance.getAllAccounts();
-    }
-    var result = await msalInstance.acquireTokenSilent({
-      scopes: ["https://service.flow.microsoft.com/.default"],
-      account: accounts[0]
-    });
-    return result.accessToken;
-  }
-
-  async function sendMessage() {
-    var input = document.getElementById("chat-input");
-    var messages = document.getElementById("chat-messages");
-    var btn = document.getElementById("send-btn");
-    var text = input.value.trim();
-    if (!text) return;
-
-    appendMessage(text, "user");
-    input.value = "";
+function lockPreviousOptions() {
+  document.querySelectorAll('.option-chip:not(.selected)').forEach(btn => {
     btn.disabled = true;
+  });
+}
 
-    var typing = appendMessage("Thinking...", "bot typing");
+function addBotBubble(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.innerHTML = `<div class="msg-avatar">SC</div><div class="bubble">${escHtml(text)}</div>`;
+  document.getElementById('messages').appendChild(row);
+  scrollBottom();
+}
 
-    try {
-      var token = await getToken();
-      var res = await fetch(FLOW_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer " + token
-        },
-        body: JSON.stringify({ message: text })
-      });
-      var data = await res.json();
-      typing.remove();
-      appendMessage(data.response || "No response received.", "bot");
-    } catch(err) {
-      typing.remove();
-      appendMessage("Error connecting. Please try again.", "bot");
-      console.error(err);
-    }
+function addUserBubble(text) {
+  lockPreviousOptions();
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `<div class="bubble">${escHtml(text)}</div><div class="msg-avatar user-av">Me</div>`;
+  document.getElementById('messages').appendChild(row);
+  scrollBottom();
+}
 
-    btn.disabled = false;
-    messages.scrollTop = messages.scrollHeight;
+function addTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.id = 'typing-row';
+  row.innerHTML = `<div class="msg-avatar">SC</div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+  document.getElementById('messages').appendChild(row);
+  scrollBottom();
+}
+
+function removeTyping() {
+  const el = document.getElementById('typing-row');
+  if (el) el.remove();
+}
+
+function showResultCard(data) {
+  const chipsHtml = (data.required_inputs || []).map(i => `<span class="input-chip">${escHtml(i)}</span>`).join('');
+  addBotBubble(data.summary);
+
+  const messages = document.getElementById('messages');
+  const card = document.createElement('div');
+  card.className = 'result-card';
+  card.id = 'result-card';
+  card.innerHTML = `
+    <div class="result-header">
+      <div class="service-code">${escHtml(data.service_code)}</div>
+      <div class="service-name">${escHtml(data.service_name)}</div>
+      <div class="category-name">${escHtml(data.category)}</div>
+    </div>
+    <div class="result-body">
+      <div class="inputs-label">Prepare before submitting</div>
+      <div>${chipsHtml}</div>
+      <button class="open-form-btn" onclick="openForm('${escHtml(data.service_code)}')">
+        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        Open request form
+      </button>
+    </div>`;
+  messages.appendChild(card);
+
+  // Post-result options
+  const optRow = document.createElement('div');
+  optRow.className = 'options-row';
+  [["That's not right", () => sendMessage("That routing is not correct, please ask me again")], ["↺ Start over", restart]].forEach(([label, fn]) => {
+    const btn = document.createElement('button');
+    btn.className = 'option-chip';
+    btn.textContent = label;
+    btn.onclick = () => { btn.classList.add('selected'); lockPreviousOptions(); fn(); };
+    optRow.appendChild(btn);
+  });
+  document.getElementById('messages').appendChild(optRow);
+  // Scroll so the card is visible at the top of the viewport
+  setTimeout(() => card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+}
+
+function openForm(code) {
+  const urls = {
+    'CI1003': 'https://weidmanngroup.sharepoint.com/sites/SAP_CoE_Operations-SAPCoEPP-AutomationService/Lists/SAP%20PP%20%26%20Automation%20Request/newform.aspx',
+    'CI1002': 'https://weidmanngroup.sharepoint.com/sites/SAP_CoE_Operations-CI1002/Lists/SAP%20PLM%20Request/newform.aspx',
+    'CI1000': 'https://weidmanngroup.sharepoint.com/sites/SAP_CoE_Operations-CI1000/Lists/SAP%20Development%20Request/newform.aspx'
+  };
+  const url = urls[code];
+  if (url) window.open(url, '_blank');
+  else addBotBubble(`Form for ${code} is not yet configured. Contact the SAP CoE team.`);
+}
+
+async function sendMessage(text) {
+  if (!text.trim() || isLoading) return;
+  addUserBubble(text);
+  history.push({ role: 'user', content: text });
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('input').value = '';
+  autoResize(document.getElementById('input'));
+  addTyping();
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 600,
+        system: SYSTEM_PROMPT,
+        messages: history
+      })
+    });
+    const data = await res.json();
+    const raw = (data.content?.[0]?.text || '{}').trim();
+    history.push({ role: 'assistant', content: raw });
+    removeTyping();
+
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; }
+
+    if (!parsed) { addBotBubble(raw); }
+    else if (parsed.type === 'question') { renderQuestion(parsed.question, parsed.options || []); }
+    else if (parsed.type === 'routed') { showResultCard(parsed); }
+    else { addBotBubble(raw); }
+
+  } catch (err) {
+    removeTyping();
+    addBotBubble('Connection error. Check the API key and try again.');
+    console.error(err);
   }
+  isLoading = false;
+  document.getElementById('sendBtn').disabled = false;
+}
 
-  function appendMessage(text, type) {
-    var messages = document.getElementById("chat-messages");
-    var div = document.createElement("div");
-    div.className = "msg " + type;
-    div.textContent = text;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
-    return div;
-  }
+function send() {
+  const val = document.getElementById('input').value.trim();
+  if (val) sendMessage(val);
+}
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 100) + 'px'; }
+function scrollBottom() { setTimeout(() => { const el = document.getElementById('messages'); el.scrollTop = el.scrollHeight; }, 50); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function restart() { init(); }
+
+init();
 </script>
 </body>
 </html>
